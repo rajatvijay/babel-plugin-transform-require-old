@@ -7,32 +7,28 @@ module.exports = function(babel) {
       VariableDeclaration: function(path, state) {
         var newPaths = path.node.declarations.map(function(declaration, index, declarationsArr) {
             if (t.isIdentifier(declaration.id) && isTransformableFunctionCall(path, declaration)) {
+
               return importDeclaration(t, [declaration.id], [], declaration.init.arguments[0]);
+
             } else if (t.isObjectPattern(declaration.id) && isTransformableFunctionCall(path, declaration)) {
-              
-              var defaultIdentifiers = declaration.id.properties.filter(function(prop) {
-                return t.isIdentifier(prop.key) && prop.key.name === 'default';
-              }).map(function(prop) {
-                return prop.value;
-              });
 
+              return importDeclaration(t, 
+                keyChecker(t, declaration.id.properties, defaultTypeChecker), 
+                keyChecker(t, declaration.id.properties, nonDefaultTypeChecker), 
+                declaration.init.arguments[0])
 
-              var generalIdentifiers = declaration.id.properties.filter(function(prop) {
-                return t.isIdentifier(prop.key) && prop.key.name !== 'default';
-              }).map(function(prop) {
-                return prop.value;
-              });
-
-
-              return importDeclaration(t, defaultIdentifiers, generalIdentifiers, declaration.init.arguments[0])
             } else if (isTransformableMemberExpression(path, declaration) && hasDefaultProperty(declaration.init)) {
+
               return importDeclaration(t, [declaration.id], [], declaration.init.object.arguments[0]);
-            } else if (isTransformableMemberExpression(path, declaration) && hasDefaultProperty(declaration.init)) {
-              return 
+
             } else if (declarationsArr.length > 1) {
+
               return variableDeclaration(t, path.node.kind, declaration);
+
             } else {
+
               return path.node;
+
             }
           })
 
@@ -57,6 +53,22 @@ var importDeclaration = function(babelTypes, defaultIdentifiers, generalIdentifi
         );
 }
 
+var defaultTypeChecker = function(name) {
+  return name === 'default';
+}
+
+var nonDefaultTypeChecker = function(name) {
+  return name !== 'default';
+}
+
+var keyChecker = function(babelTypes, props, typeChecker) {
+  return props.filter(function(prop) {
+    return babelTypes.isIdentifier(prop.key) && typeChecker(prop.key.name);
+  }).map(function(prop) {
+    return prop.value;
+  });
+}
+
 var variableDeclaration = function(babelTypes, kind, declaration) {
   return babelTypes.variableDeclaration(kind, [declaration])
 }
@@ -65,12 +77,10 @@ var isInitialized = function(declaration) {
   return declaration.init !== null;
 }
 
-// Need a better name
 var isFunctionCall = function(node) {
   return node.type === 'CallExpression';
 }
 
-// Need a better name
 var isMemberExpression = function(node) {
   return node.type === 'MemberExpression';
 }
