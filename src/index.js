@@ -1,7 +1,9 @@
 // Need to implement warnings
 
 module.exports = function(babel) {
+
   var t = babel.types;
+
   return {
     visitor: {
       VariableDeclaration: function(path, state) {
